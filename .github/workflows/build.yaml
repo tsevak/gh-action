@@ -35,7 +35,7 @@ jobs:
     
     - name: Slack Notification if Container build got failed
       if: failure() && steps.dbuild.outcome == 'failure'
-      uses: slackapi/slack-github-action@v1.23.0
+      uses: slackapi/slack-github-action@v1.24.0
       with:
         payload: |
             {
@@ -45,7 +45,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Job failed due to container build is failing..."
+                    "text": "Build process failed due to container build is failing..."
                   }
                 }
               ]
@@ -68,7 +68,7 @@ jobs:
 
     - name: Slack Notification after Scan
       if: failure() && steps.scanner.outcome == 'failure'
-      uses: slackapi/slack-github-action@v1.23.0
+      uses: slackapi/slack-github-action@v1.24.0
       with:
         payload: |
             {
@@ -78,7 +78,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Job failed due to vulerbilities in Continaer Image"
+                    "text": "Build process failed due to vulerbilities in Container Image"
                   }
                 }
               ]
@@ -94,7 +94,7 @@ jobs:
 
     - name: Success notification to Slack
       id: slack
-      uses: slackapi/slack-github-action@v1.23.0
+      uses: slackapi/slack-github-action@v1.24.0
       with:
         payload: |
           {
@@ -104,7 +104,7 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "Successfully completed Container Build action"
+                  "text": "Build process Successfully completed and image pushed to registry"
                   }
                 }
               ]
