@@ -10,3 +10,7 @@ Currently configured event triggers are push on main branch and manual worflow r
 * Configure secrets based repo
     * Slack webhook url for notifications
     * Container registry authentication access details
+  
+
+## Integration with Slack to get notifications
+![gh-action-slack](gh-action-slack-notfication.png)
