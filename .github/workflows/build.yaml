@@ -87,7 +87,7 @@ jobs:
     - name: Print Success msg and Push to registry
       run: |
         echo 'Image passed from trivy scanner and now pushing to Container registry'
-        docker push singymingy86/nginx_hello:${{ steps.gtag.outputs.TAG }}
+        docker push ${{ secrets.USERNAME }}/web_hello:${{ steps.gtag.outputs.TAG }}
 
     # - name: Success notification to Slack
     #   id: slack
