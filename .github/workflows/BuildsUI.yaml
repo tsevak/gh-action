@@ -1,11 +1,15 @@
-name: Build-Image
+name: Build-UI
 
-on: 
+on:
   workflow_dispatch:
-  push:
-    branches:
-        - 'main'
-
+    inputs:
+      app:
+        description: 'Select the application: ( Example - nginx ) '
+        required: true
+      app_version:
+        description: 'Define the version:  ( Ex 0.1 or 1.2 or 2. Default: latest )'
+        required: true
+        default: 'latest'
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -13,27 +17,28 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-     
-    - name: print msg
-      run: echo "Building Container Image:"
 
-    - name: Get TAG from short GIT SHA
-      id: gtag
-      run: echo "TAG=$(git rev-parse --short $GITHUB_SHA)" >> $GITHUB_OUTPUT
-    
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
     - name: Login to Registry
       uses: docker/login-action@v2
       with:
         username: ${{ secrets.USERNAME }}
         password: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
- 
-    - name: Docker Build & tag
+
+    - name: Build Image
       id: dbuild
-      run: |
-         docker build -t web_hello:${{ steps.gtag.outputs.TAG }} .
-         docker tag web_hello:${{ steps.gtag.outputs.TAG }} ${{ secrets.USERNAME }}/web_hello:${{ steps.gtag.outputs.TAG }}
-    
-    - name: Slack Notification if Container build got failed
+      uses: docker/build-push-action@v4
+      with:
+        context: ${{ github.event.inputs.app }}
+        load: true
+        tags: ${{ secrets.USERNAME }}/${{ github.event.inputs.app }}:${{ github.event.inputs.app_version }}
+
+    - name: Slack Notification if Container build got failed due to build issues
       if: failure() && steps.dbuild.outcome == 'failure'
       uses: slackapi/slack-github-action@v1.24.0
       with:
@@ -54,12 +59,12 @@ jobs:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
-    
+
     - name: Run Trivy vulnerability scanner
       id: scanner
       uses: aquasecurity/trivy-action@master
       with:
-          image-ref: "web_hello:${{ steps.gtag.outputs.TAG }}"
+          image-ref: ${{ secrets.USERNAME }}/${{ github.event.inputs.app }}:${{ github.event.inputs.app_version }}
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
@@ -87,10 +92,12 @@ jobs:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
-    - name: Print Success msg and Push to registry
-      run: |
-        echo 'Image passed from trivy scanner and now pushing to Container registry'
-        docker push ${{ secrets.USERNAME }}/web_hello:${{ steps.gtag.outputs.TAG }}
+    - name: Push to registry
+      uses: docker/build-push-action@v4
+      with:
+        context: ${{ github.event.inputs.app }}
+        push: true
+        tags: ${{ secrets.USERNAME }}/${{ github.event.inputs.app }}:${{ github.event.inputs.app_version }}
 
     - name: Success notification to Slack
       id: slack
@@ -104,7 +111,7 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "Build process Successfully completed and image pushed to registry"
+                  "text": "Build process Successfully completed for ${{ secrets.USERNAME }}/${{ github.event.inputs.app }}:${{ github.event.inputs.app_version }} and image pushed to registry"
                   }
                 }
               ]
