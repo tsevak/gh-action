@@ -1,0 +1,111 @@
+name: Build-Image
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+     
+    - name: print msg
+      run: echo "Building Container Image:"
+
+    - name: Get TAG from short GIT SHA
+      id: gtag
+      run: echo "TAG=$(git rev-parse --short $GITHUB_SHA)" >> $GITHUB_OUTPUT
+    
+    - name: Login to Registry
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.USERNAME }}
+        password: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
+ 
+    - name: Docker Build & tag
+      id: dbuild
+      run: |
+         docker build -t web_hello:${{ steps.gtag.outputs.TAG }} .
+         docker tag web_hello:${{ steps.gtag.outputs.TAG }} ${{ secrets.registry }}/web_hello:${{ steps.gtag.outputs.TAG }}
+    
+    - name: Slack Notification if Container build got failed
+      if: failure() && steps.dbuild.outcome == 'failure'
+      uses: slackapi/slack-github-action@v1.23.0
+      with:
+        payload: |
+            {
+              "text": "GitHub Action build result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Job failed due to container build is failing..."
+                  }
+                }
+              ]
+            }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+    
+    - name: Run Trivy vulnerability scanner
+      id: scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+          image-ref: "web_hello:${{ steps.gtag.outputs.TAG }}"
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+    - name: Slack Notification after Scan
+      if: failure() && steps.scanner.outcome == 'failure'
+      uses: slackapi/slack-github-action@v1.23.0
+      with:
+        payload: |
+            {
+              "text": "GitHub Action build result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Job failed due to vulerbilities in Continaer Image"
+                  }
+                }
+              ]
+            }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+    - name: Print Success msg and Push to registry
+      run: |
+        echo 'Image passed from trivy scanner and now pushing to Container registry'
+        docker push singymingy86/nginx_hello:${{ steps.gtag.outputs.TAG }}
+
+    - name: Success notification to Slack
+      id: slack
+      uses: slackapi/slack-github-action@v1.23.0
+      with:
+        payload: |
+          {
+            "text": "GitHub Action build result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "Successfully completed Container Build action"
+                  }
+                }
+              ]
+            }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
